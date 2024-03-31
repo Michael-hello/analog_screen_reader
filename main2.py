@@ -28,7 +28,7 @@ cv2.imshow('Sobel X Y using Sobel() function', sobelxy)
 cv2.waitKey(0)
  
 # Canny Edge Detection
-edges = cv2.Canny(image=img_blur, threshold1=100, threshold2=200) # Canny Edge Detection
+edges = cv2.Canny(image=img_blur, threshold1=155, threshold2=190) # Canny Edge Detection
 # Display Canny Edge Detection Image
 # cv2.imshow('Canny Edge Detection', edges)
 cv2.imwrite("./out_canny.png", sobelxy)

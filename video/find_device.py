@@ -13,6 +13,8 @@ def getAttributes(box):
     rot = box[2]
     return w, h, cX, cY, rot
 
+
+#determins if a given contour is the LCD screen
 def isDevice(contour) -> bool:
 
     area = cv2.contourArea(contour)
@@ -24,7 +26,7 @@ def isDevice(contour) -> bool:
         #in a perfect world the ratio is approx 1.5      
         if ratio > 1.25 and ratio < 1.75:
             w, h, cX, cY, rot = getAttributes(cv2.minAreaRect(contour))
-            print(ratio, area, w , h)
+            # print(ratio, area, w , h)
             return True
     
     return False
