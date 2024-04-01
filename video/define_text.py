@@ -1,16 +1,21 @@
 import cv2 
 import numpy as np
+import json
+import uuid
 
 class Slice:
                                 
-    def __init__(self, isVert, contour, xMax, xMin, yMax, yMin):
-        self.isVert = isVert
+    def __init__(self, contour, xMax, xMin, yMax, yMin):
         self.contour = contour
         self.xMax = xMax
         self.xMin = xMin
         self.yMax = yMax
         self.yMin = yMin
-    
+        self.h = yMax - yMin
+        self.w = xMax - xMin
+        #if a slice is a vertical or horizotnal orientation
+        self.isVert = self.h > 1.5 * self.w
+
     #to simplify comparisons, a slice is treated as a line with 2 end points
     def getVerticies(self):
 
@@ -20,6 +25,18 @@ class Slice:
         else:
             yAvg = (self.yMax + self.yMin) / 2
             return [ [ self.xMin, yAvg ], [ self.xMax, yAvg ] ]
+        
+    def toJSON(self):
+        dict = {
+            'xMax' :   float(self.xMax),
+            'xMin' :   float(self.xMin),
+            'yMax' :   float(self.yMax),
+            'yMin' :   float(self.yMin),
+            'h' :      float(self.h),
+            'w' :      float(self.w),
+            'type' : 'vertical' if self.isVert else 'horizontal'
+        }
+        return json.dumps(dict)
 
 
 #digit currently is just a collection of slices
@@ -27,6 +44,13 @@ class Digit:
 
     def __init__(self, slice: Slice):
         self.slices = [ slice ]
+        self.id = uuid.uuid4()
+
+    def toJSON(self):
+        list = []
+        for slice in self.slices:
+            list.append(slice.toJSON())
+        return list
 
 
 
@@ -49,8 +73,8 @@ def digitToText(digit: Digit) -> int:
 
     slices = digit.slices
     count = len(slices)
-    vCount = filter(lambda x: x.isVert == True, slices)
-    hCount = filter(lambda x: x.isVert == False, slices)
+    vCount = len(list(filter(lambda x: x.isVert == True, slices)))
+    hCount = len(list(filter(lambda x: x.isVert == False, slices)))
 
     if count < 2 or count > 7:
         return None
@@ -76,9 +100,57 @@ def digitToText(digit: Digit) -> int:
     if count == 5 and vCount == 3:
         return 9
     
-    if count == 5:
-        #TO DO: implement logic for 2 3 and 5
-        return #2 3 5
+    if count == 5 and vCount == 2 and hCount == 3:
+        #need to determine if the vertical slices are on teh left or the right of the digit
+        verticals: list[Slice] = list(filter(lambda x: x.isVert == True, slices))
+        horizontals: list[Slice] = list(filter(lambda x: x.isVert == False, slices))
+        
+        avgLeftX = 0
+        avgRightX = 0
+        top = horizontals[0].yMin
+        bot = horizontals[0].yMax
+
+        # loop through 3 h slices to determine diemsnions of the digit
+        for slice in horizontals:
+            avgLeftX += slice.xMin
+            avgRightX += slice.xMax
+            if slice.yMin < top:
+                top = slice.yMin
+            if slice.yMax > bot:
+                bot = slice.yMax
+
+        leftX = avgLeftX / len(horizontals)
+        rightX = avgRightX / len(horizontals)
+
+        leftVert: list[Slice] = []
+        rightVert: list[Slice] = []
+
+        #decide if vertical slices are on the left or right of the digit
+        for vert in verticals:
+            avgX = (vert.xMax + vert.xMin) / 2
+            diffLeft = np.abs(leftX - avgX)
+            diffRight = np.abs(rightX - avgX)
+            if diffLeft < diffRight:
+                leftVert.append(vert)
+            else:
+                rightVert.append(vert)
+
+        #2 right slices therefore is 3
+        if len(rightVert) == 2:
+            return 3
+        
+        #if left vertical is top then is 5, otherwise is 2
+        if (len(leftVert)) == 1:
+            left: Slice = leftVert[0]
+            avgY = (left.yMax + left.yMin) / 2
+            diffTop = np.abs(top - avgY)
+            diffBot = np.abs(bot - avgY)
+            if diffTop < diffBot:
+                return 5
+            else:
+                return 2
+        
+    return None
 
 
 #determine which digit the given slice belongs to
@@ -112,20 +184,14 @@ def getDigit(digits: list[Digit], slice: Slice, tollarance: int) -> Digit:
 
 
 #estimates a suitable tollarance value based on dimensions of slices
-def getTollarance(contours) -> int:
+def getTollarance(slices: list[Slice]) -> int:
 
     avg: list[float] = []
-    i = 0
 
-    while len(avg) < 5 and i < len(contours) - 1:
-        #to do make this more efficient?
-        i += 1
-        contour2 = cv2.approxPolyDP(contours[i], 10, True)
-        x, y, w, h = cv2.boundingRect(contour2)
-        isVert = h > 1.5 * w
-        # print(isVert, x, y , w ,h)
-        if isVert:
-            avg.append(h)
+    for i in range(len(slices)):
+        slice = slices[i]
+        if slice.isVert:
+            avg.append(slice.h)
     
     if len(avg) == 0:
         return 5
@@ -138,19 +204,18 @@ def getTollarance(contours) -> int:
 #contours is an array of slices defining different digits
 def defineText(contours):
 
-    digits: list[Digit] = []
-    tollarance = getTollarance(contours)
+    slices: list[Slice] = []
 
     #each digit defines a number. Each number is composed of 2 to 7 slices
     #each contour defines a slice of 1 or more digits
     #to simplify comparisons, each slice is simplified / conseptulaised as a line
     #the analogue screen consists of two types of slices, vertical and horizontal
 
+    #first we generate all slices
     for i in range(len(contours)):
 
-        #epsilon of 10 used, this is the max number of verticies
-        contour2 = cv2.approxPolyDP(contours[i], 10, True)
-        x, y, w, h = cv2.boundingRect(contour2)
+        #epsilon of 50 used, this is the max number of verticies
+        contour2 = cv2.approxPolyDP(contours[i], 50, True)
 
         xVals = getVals(contour2, 0)
         yVals = getVals(contour2, 1)
@@ -159,9 +224,17 @@ def defineText(contours):
         xMin = np.min(xVals)
         yMax = np.max(yVals)
         yMin = np.min(yVals)
+        
+        slice = Slice(contour2, xMax, xMin, yMax, yMin)
+        slices.append(slice)
 
-        isVert = h > 1.5 * w
-        slice = Slice(isVert, contour2, xMax, xMin, yMax, yMin)
+
+    digits: list[Digit] = []
+    tollarance = getTollarance(slices)
+
+    #loop through slices and assign to corresponding digits
+    for i in range(len(slices)):
+        slice = slices[i]
 
         #first slice, create new digit
         if len(digits) == 0:
@@ -174,6 +247,7 @@ def defineText(contours):
             else:
                 digit.slices.append(slice)      
     
+
     #return the x value of the first verticie of the first slice
     def sortFunc(e: Digit):
         verts = e.slices[0].getVerticies()
@@ -181,6 +255,11 @@ def defineText(contours):
     
     filtered = filter(lambda x: len(x.slices) > 0, digits)
     _sorted = sorted(filtered, reverse=False, key=sortFunc)
+
+    for i in range(len(_sorted)):
+        digit = _sorted[i]
+        for slice in digit.slices:
+            print('digit: ' + str(i) + ' slices:' + str(len(digit.slices)) + slice.toJSON() )
 
     finalValue = 0
     count = len(_sorted)

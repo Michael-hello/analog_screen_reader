@@ -23,11 +23,14 @@ cv2.createTrackbar("lower", "Trackbars", 150, 255, nothing)
 cv2.createTrackbar("upper", "Trackbars", 255, 255, nothing)
 
 #skips first 250 frames where back light is off
-framenumber = 250
+framenumber = 300
 cap.set(cv2.CAP_PROP_POS_FRAMES, np.intp(framenumber))
 
 
 while True:
+
+    cap.set(cv2.CAP_PROP_POS_FRAMES, np.intp(framenumber))
+    framenumber += 20
 
     _, frame = cap.read()
 
@@ -77,6 +80,7 @@ while True:
     # showInWindow('gggg', frame, 0, 700)
 
     time.sleep(1)
+    
 
     key = cv2.waitKey(1)
     if key == 27: # key 27 is "esc" key
