@@ -3,47 +3,50 @@ import numpy as np
 import time
 from find_device import isDevice, getAttributes
 from find_text import findText
-from helpers import showInWindow
+from helpers import showInWindow, makeSafe, saveImage, deleteAllFiles, formatValue
 
 def nothing(x):
     pass
 
-def makeSafe(x: float) -> int:
-    int = np.intp(x)
-    return np.max([ 0, int ])
+deleteAllFiles('./results')
 
 cap = cv2.VideoCapture('./data/test4.mp4')
-length = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
 cv2.namedWindow("Trackbars")
 cv2.resizeWindow("Trackbars", 600, 600)
 
-#defaults of 155 and 190 work with this example
+#defaults of 150 and 255 work well with this example
 cv2.createTrackbar("lower", "Trackbars", 150, 255, nothing)
 cv2.createTrackbar("upper", "Trackbars", 255, 255, nothing)
+cv2.createTrackbar("limit", "Trackbars", 2, 100, nothing)
+cv2.createTrackbar("grid", "Trackbars", 14, 30, nothing)
 
 #skips first 250 frames where back light is off
-framenumber = 300
+framenumber = 200 #525
 cap.set(cv2.CAP_PROP_POS_FRAMES, np.intp(framenumber))
-
+validValues = 0
 
 while True:
 
-    cap.set(cv2.CAP_PROP_POS_FRAMES, np.intp(framenumber))
-    framenumber += 20
+    ret, frame = cap.read()
+    framenumber += 1
 
-    _, frame = cap.read()
-
+    if framenumber >= total_frames:
+        break
+    
     frame2 = frame.copy()
-    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    frame3 = frame.copy()
+    frame4 = frame.copy()
+    digitised_val = None
+
+    gray = cv2.cvtColor(frame.copy(), cv2.COLOR_BGR2GRAY)
     
     lower = cv2.getTrackbarPos("lower", "Trackbars")
     upper = cv2.getTrackbarPos("upper", "Trackbars")
  
-    _, th2 = cv2.threshold(gray, lower, upper, 0)
-    # contours, hierarchy = cv2.findContours(th2, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    _, th2 = cv2.threshold(gray.copy(), lower, upper, 0)
     contours, hierarchy = cv2.findContours(th2, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
-    frame = cv2.drawContours(frame, contours, -1, (0,255,75), 2)
 
     for i in range(len(contours)):
         contour = contours[i]
@@ -66,25 +69,39 @@ while True:
             rotated = cv2.warpAffine(frame, M, (width, height))
             cropped = rotated[y1:y2, x1:x2]
 
+            #applies a 90 degree rotation so image is horizontal
             height, width = cropped.shape[:2]
             max = np.max([height, width])
             M2 = cv2.getRotationMatrix2D((width / 2, height / 2), 90, 1.0)
             rotated2 = cv2.warpAffine(cropped, M2, (max, max))
+            
+            frame = rotated2.copy()         
+            limit = cv2.getTrackbarPos("limit", "Trackbars")
+            grid = np.intp(cv2.getTrackbarPos("grid", "Trackbars"))
 
-            parentArea = width * height            
-            frame2 = findText(rotated2.copy(), lower, upper, parentArea, True)
+            # frame2 = findText(rotated2.copy(), lower, upper,  True)
+            # frame3 = findText(rotated2.copy(), lower, upper,  False)
+            frame4, digitised_val = findText(rotated2.copy(), lower, upper, False, True, limit, grid)
 
 
-    showInWindow('gg', th2, 700, 0)
-    showInWindow('ggg', frame2, 700, 500)
-    # showInWindow('gggg', frame, 0, 700)
+    # showInWindow('gg', frame, 700, 0)
+    # showInWindow('adaptive', frame2, 700, 500)
+    # showInWindow('standard threshold', frame3, 1300, 500, str(framenumber))
+    # showInWindow('lab', frame4, 1300, 0)
 
-    time.sleep(1)
+    # time.sleep(0.33) 
+
+    if digitised_val != None:
+        validValues += 1
     
+    label = str(framenumber) + '_' + formatValue(digitised_val)
+    image = cv2.putText(frame4, label, (00, 185), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2, 2) 
+    saveImage(image, label) 
 
     key = cv2.waitKey(1)
     if key == 27: # key 27 is "esc" key
         break
 
+print('VALID VALUES: ', str(validValues))
 cap.release()
 cv2.destroyAllWindows()
