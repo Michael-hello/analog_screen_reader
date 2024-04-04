@@ -42,7 +42,6 @@ class Slice:
 
 
 
-#digit currently is just a collection of slices
 class Digit:
 
     def __init__(self, slice: Slice):
@@ -54,4 +53,12 @@ class Digit:
         for slice in self.slices:
             list.append(slice.toJSON())
         return list
+    
+    #returns maximum x val of all slices
+    def getXmax(self):
+        return np.max([ x.xMax for x in self.slices ])
+
+    #returns min x val of all slices
+    def getXmin(self):
+        return np.min([ x.xMin for x in self.slices ])
 

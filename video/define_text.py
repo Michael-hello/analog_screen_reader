@@ -2,7 +2,6 @@ import cv2
 import numpy as np
 from digits import Digit, Slice
 from digit_2_val import digitToText
-from helpers import getAttributes
 
 #pos == 0 for x, pos == 1 for y
 def getVals(contour, pos: int):  
@@ -49,23 +48,39 @@ def getDigit(digits: list[Digit], slice: Slice, tollarance: int) -> Digit:
     return None
 
 
-#validate the digits
-def validateDigits(digits: list[Digit]) -> bool:
+#validate the digits sorted from left to right
+#hTollarance is minimum distance required between digits
+def validateDigits(digits: list[Digit], hTollarance) -> bool:
+
     valid = True
     count = len(digits)
 
     #4 digits includes values up to 999.9kg
-    if count < 2 or count > 4: valid = False 
+    if count < 2 or count > 4: 
+        return False 
 
-    for digit in digits:
+    for i in range(count):
+        digit = digits[i]
         sCount = len(digit.slices)
         verticals: list[Slice] = list(filter(lambda x: x.isVert == True, digit.slices))
         horizontals: list[Slice] = list(filter(lambda x: x.isVert == False, digit.slices))
         vCount = len(verticals)
         hCount = len(horizontals)
 
+        #check that identified digits are not too close
+        if i < count - 1:
+            nextDigit = digits[i + 1]
+            xRight = digit.getXmax()
+            xLeft = nextDigit.getXmin()
+
+            if np.abs(xRight - xLeft) < hTollarance:
+                return False
+
         if sCount < 2 or sCount > 7: 
-            valid = False
+            return False
+        
+        if vCount < 2:
+            return False
 
         #validations for number 1, difficult to do elsewhere
         if sCount == 2 and vCount == 2:
@@ -152,16 +167,15 @@ def defineText(contours):
                 digit.slices.append(slice)      
     
 
-    if validateDigits(digits) == False:
-        return None
-
     #return the x value of the first verticie of the first slice
     def sortFunc(e: Digit):
-        verts = e.slices[0].getVerticies()
-        return verts[0][0]
+        return e.getXmax()
     
     filtered = filter(lambda x: len(x.slices) > 0, digits)
     _sorted = sorted(filtered, reverse=False, key=sortFunc)
+
+    if validateDigits(_sorted, tollarance / 2) == False:
+        return None
 
     # for i in range(len(_sorted)):
     #     digit = _sorted[i]
