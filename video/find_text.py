@@ -36,13 +36,16 @@ def getParams(contour):
 
 
 # #if contour is too close to top or side of screen: invalid
-def validateContour(contour, screen_contour) -> bool:
+def validateContour(contour, maxX_screen: int, minY_screen: int, xTollarance: int, yTollarance: int) -> bool:
 
-    tollarance = 20
-    maxX_screen, minY_screen = getParams(screen_contour)
     maxX, minY = getParams(contour)
+    
+    #aims to remove the triangle in bottom right corner
+    if np.abs(maxX_screen - maxX) < xTollarance:
+        return False
 
-    if np.abs(maxX_screen - maxX) < tollarance:
+    #aims to remove any small letters close to top of screen
+    if np.abs(minY_screen - minY) < yTollarance:
         return False    
 
     return True
@@ -92,7 +95,12 @@ def findText(cropped, lower, upper, adaptive = False, lab = False, limit=2.0, gr
             largest_area = area
             largest_contour = contours[i]
 
-    image = cv2.drawContours(image, [ largest_contour ], 0, (0, 255, 0), thickness=2) #cv2.FILLED)
+    maxX_screen, minY_screen = getParams(largest_contour)
+    x, y, w, h = cv2.boundingRect(largest_contour)
+    xTollarance = w / 40
+    yTollarance = h / 10
+
+    image = cv2.drawContours(image, [ largest_contour ], 0, (0, 255, 0), thickness=2)
 
     for i in range(len(contours)):
         area = cv2.contourArea(contours[i])
@@ -108,7 +116,7 @@ def findText(cropped, lower, upper, adaptive = False, lab = False, limit=2.0, gr
 
                 contours2 = cv2.approxPolyDP(contours[i], 2, True)
                 
-                if validateContour(contours2, largest_contour) == False:
+                if validateContour(contours2, maxX_screen, minY_screen, xTollarance, yTollarance) == False:
                     continue
 
                 image = cv2.drawContours(image, [ contours2 ], 0, (0, 0, 255), thickness=2) #cv2.FILLED)

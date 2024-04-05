@@ -61,4 +61,12 @@ class Digit:
     #returns min x val of all slices
     def getXmin(self):
         return np.min([ x.xMin for x in self.slices ])
+    
+    #returns maximum y val of all slices
+    def getYmax(self):
+        return np.max([ x.yMax for x in self.slices ])
+
+    #returns min y val of all slices
+    def getYmin(self):
+        return np.min([ x.yMin for x in self.slices ])
 

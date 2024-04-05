@@ -80,20 +80,22 @@ def validateDigits(digits: list[Digit], hTollarance) -> bool:
             return False
         
         if vCount < 2:
+            return False  
+
+        yMax = digit.getYmin()
+        yMin = digit.getYmax()
+        avgH = np.mean([ x.h for x in verticals ])
+        digitHeight = np.abs(yMax - yMin)    
+
+        #check that total height is equal to 2 stacked vertical slices
+        if digitHeight < 1.75 * avgH:
             return False
 
         #validations for number 1, difficult to do elsewhere
         if sCount == 2 and vCount == 2:
-            yMin = np.min([ x.yMin for x in verticals ])
-            yMax = np.max([ x.yMax for x in verticals ])
             xMin = np.min([ x.xMin for x in verticals ])
             xMax = np.max([ x.xMax for x in verticals ])
-            height = np.mean([ x.h for x in verticals ])
             width = np.mean([ x.w for x in verticals ])
-
-            #this checks if the two verticals are parallel - which is invalid when only 2 available
-            if yMax - yMin < 1.5 * height:
-                valid = False
 
             #checks if the 2 verticals are in line with each other
             if xMax - xMin > 2 * width:

@@ -22,7 +22,7 @@ cv2.createTrackbar("upper", "Trackbars", 255, 255, nothing)
 cv2.createTrackbar("limit", "Trackbars", 2, 100, nothing)
 cv2.createTrackbar("grid", "Trackbars", 14, 30, nothing)
 
-#skips first 250 frames where back light is off
+#skips first 200frames where back light is off
 framenumber = 200 #525
 cap.set(cv2.CAP_PROP_POS_FRAMES, np.intp(framenumber))
 validValues = 0
@@ -45,7 +45,7 @@ while True:
     lower = cv2.getTrackbarPos("lower", "Trackbars")
     upper = cv2.getTrackbarPos("upper", "Trackbars")
  
-    _, th2 = cv2.threshold(gray.copy(), lower, upper, 0)
+    _, th2 = cv2.threshold(gray.copy(), 150, 255, 0)
     contours, hierarchy = cv2.findContours(th2, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
 
     for i in range(len(contours)):
@@ -79,17 +79,12 @@ while True:
             limit = cv2.getTrackbarPos("limit", "Trackbars")
             grid = np.intp(cv2.getTrackbarPos("grid", "Trackbars"))
 
-            # frame2 = findText(rotated2.copy(), lower, upper,  True)
-            # frame3 = findText(rotated2.copy(), lower, upper,  False)
             frame4, digitised_val = findText(rotated2.copy(), lower, upper, False, True, limit, grid)
 
 
-    # showInWindow('gg', frame, 700, 0)
-    # showInWindow('adaptive', frame2, 700, 500)
-    # showInWindow('standard threshold', frame3, 1300, 500, str(framenumber))
-    # showInWindow('lab', frame4, 1300, 0)
 
-    # time.sleep(0.33) 
+    # showInWindow('lab', frame4, 1300, 0)
+    # time.sleep(0.2) 
 
     if digitised_val != None:
         validValues += 1
